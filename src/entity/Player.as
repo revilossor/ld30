@@ -4,6 +4,7 @@ package entity
 	import org.flixel.FlxG;
 	import org.flixel.FlxGroup;
 	import org.flixel.FlxObject;
+	import org.flixel.FlxPoint;
 	import org.flixel.FlxRect;
 	import org.flixel.FlxSprite;
 	/**
@@ -41,7 +42,7 @@ package entity
 		public var _sprite:FlxSprite;
 		public var _hit:FlxSprite;
 		public var _overlap:FlxSprite;
-		private var _core:FlxSprite;
+		public var _core:FlxSprite;
 		
 		private var x:Number;
 		private var y:Number;
@@ -50,13 +51,17 @@ package entity
 		private var _isFiring:Boolean = false;
 		private var _doFire:Boolean = false;
 		private var _lastPressed:uint;
-		private var _shotCooldown:uint = 60;
-		private var FIRE_RATE:uint = 60;
+		private var _shotCooldown:uint = 20;
+		private var FIRE_RATE:uint = 20;
+		
+		public var bullets:FlxGroup;
+		
+		private var _counter:uint = 0;
 		
 		static private const MAX_SPEED_MULTIPLIER:Number = 8;
 		static private const MOVE_ACCELERATION:Object = {
-			x:FlxG.width / 50,
-			y:FlxG.height / 50
+			x:FlxG.width / 40,
+			y:FlxG.height / 40
 		};
 		static private const MOVE_DRAG:Object = {
 			x:FlxG.width / 500,
@@ -66,19 +71,20 @@ package entity
 		public function Player(xp:uint, yp:uint) 
 		{
 			super();
+			bullets = new FlxGroup();
 			addEntity(CORE);
 			addEntity(SPRITEBOX);
 			addEntity(HITBOX);
 			addEntity(OVERLAPBOX);
 			assignKeys();
-			_core.visible = _hit.visible = _overlap.visible = false;
+			_overlap.visible = _hit.visible = _core.visible = false;
 		}
 		
 		private function addEntity(type:String):void {
 			switch(type) {
 				case CORE:
 					add(_core = new FlxSprite());
-					_core.makeGraphic(2, 2, 0xffffffff);
+					_core.makeGraphic(21, 15, 0xffffffff);
 					setupCore();
 				break
 				case SPRITEBOX:
@@ -91,7 +97,7 @@ package entity
 				break;
 				case OVERLAPBOX:
 					add(_overlap = new FlxSprite());
-					_overlap.makeGraphic(21, 3, 0xff0000ff);
+					_overlap.makeGraphic(21, 21, 0xff0000ff);
 				break;
 			}
 		}
@@ -106,10 +112,10 @@ package entity
 		}
 		private function setupSpritebox():void {
 			_sprite.loadGraphic(Embed.player_48x48, true, false, 48, 48);
-			_sprite.addAnimation(WALK_LEFT,		[15, 16, 15, 17], 	8);
-			_sprite.addAnimation(WALK_RIGHT,	[12, 11, 12, 10], 	8);
-			_sprite.addAnimation(WALK_UP,		[0, 1, 0, 2], 		8);
-			_sprite.addAnimation(WALK_DOWN,		[5, 6, 5, 7], 		7);
+			_sprite.addAnimation(WALK_LEFT,		[15, 16, 15, 17], 	9);
+			_sprite.addAnimation(WALK_RIGHT,	[12, 11, 12, 10], 	9);
+			_sprite.addAnimation(WALK_UP,		[0, 1, 0, 2], 		9);
+			_sprite.addAnimation(WALK_DOWN,		[5, 6, 5, 7], 		8);
 			_sprite.addAnimation(STAND_UP, 		[0]);
 			_sprite.addAnimation(STAND_DOWN,	[5]);
 			_sprite.addAnimation(STAND_LEFT,	[15]);
@@ -134,9 +140,10 @@ package entity
 		}
 		
 		private function fireHandling():void {
+			_counter++;
 			if (_isFiring) {
 				_shotCooldown--;
-				if (_shotCooldown > FIRE_RATE - 10 && _isFiring) {
+				if (_shotCooldown > FIRE_RATE - 5 && _isFiring) {
 					if (Registry.PAUSE_STATE == PauseButton.PAUSE) {
 						switch(_lastPressed) {
 							case FlxObject.UP : 	_sprite.play(SHOOT_UP);	break;
@@ -145,7 +152,7 @@ package entity
 							case FlxObject.RIGHT : 	_sprite.play(SHOOT_RIGHT);	break;
 						}
 					}
-				}else if(_shotCooldown <= FIRE_RATE - 10 && _isFiring) {
+				}else if(_shotCooldown <= FIRE_RATE - 5 && _isFiring) {
 					if (Registry.PAUSE_STATE == PauseButton.PAUSE) {
 						switch(_lastPressed) {
 							case FlxObject.UP : 	_sprite.play(STAND_UP);	break;
@@ -172,11 +179,18 @@ package entity
 			if (_doFire) {
 				fire();
 			}
+			for (var i:int = 0; i < bullets.length; i++) {
+				if (!bullets.members[i].alive) {
+					bullets.members[i].destroy();
+					remove(bullets.members[i], true);
+				}
+			}
 		}
 		public function resetFiring():void {
 			_isFiring = true;
-			_shotCooldown = FIRE_RATE - 1;		
+			_shotCooldown = 1;		
 			_doFire = true;
+			_counter = 0;
 		}
 		private function keyHandling():void {
 			if (FlxG.keys.justPressed(RIGHT_KEY)) 								{ right_pressed(); }
@@ -205,9 +219,9 @@ package entity
 		private function applyForce(direction:uint, magnitude:Number):void {
 			switch(direction) {
 				case FlxObject.UP:
-					if (_core.y < 0 +_hit.height/2 && _isWalking) { 
+					if (_core.y < 0 + _sprite.height/2+9 && _isWalking) { 
 						stop(FlxObject.PATH_VERTICAL_ONLY);
-						_core.y = 0 + _hit.height / 2;
+						_core.y = 0+ _sprite.height/2+9;
 					}
 					else {
 						_core.velocity.y -= magnitude;
@@ -215,9 +229,9 @@ package entity
 					if (!_isWalking) { _sprite.play(WALK_UP); }
 				break;
 				case FlxObject.DOWN:
-					if (_core.y + _hit.height / 2 > FlxG.height&& _isWalking) {
+					if (_core.y > FlxG.height - _core.height && _isWalking) {
 						stop(FlxObject.PATH_VERTICAL_ONLY);
-						_core.y = FlxG.height - _hit.height / 2;
+						_core.y = FlxG.height - _core.height;
 					}
 					else {
 						_core.velocity.y += magnitude;
@@ -225,9 +239,9 @@ package entity
 					if (!_isWalking) { _sprite.play(WALK_DOWN); }
 				break;					
 				case FlxObject.LEFT:	
-					if (_core.x < 0 + _hit.width - 3 && _isWalking) {
+					if (_core.x < 0 && _isWalking) {
 						stop(FlxObject.PATH_HORIZONTAL_ONLY);
-						_core.x = 0 + _hit.width - 3;
+						_core.x = 0;
 					}
 					else {
 						_core.velocity.x -= magnitude;
@@ -235,9 +249,9 @@ package entity
 					if (!_isWalking) { _sprite.play(WALK_LEFT); }
 				break;
 				case FlxObject.RIGHT:	
-					if (_core.x > FlxG.width - 3 && _isWalking) {
+					if (_core.x > FlxG.width - _core.width && _isWalking) {
 						stop(FlxObject.PATH_HORIZONTAL_ONLY);
-						_core.x = FlxG.width - 3;
+						_core.x = FlxG.width - _core.width;
 					}
 					else {
 						_core.velocity.x += magnitude;
@@ -269,12 +283,12 @@ package entity
 			}
 		}
 		private function alignEntityPosition():void {
-			_sprite.x = 	_core.x - _sprite.width / 2 - 8;
-			_sprite.y = 	_core.y - _sprite.height / 2;
+			_sprite.x = 	_core.x - 13;
+			_sprite.y = 	_core.y - _sprite.height / 2 - 8;
 			_hit.x = 		_core.x - _sprite.width / 2 + 7;
 			_hit.y = 		_core.y - _sprite.height / 2;
 			_overlap.x = 	_core.x - _sprite.width / 2 + 7;
-			_overlap.y = 	_core.y + _sprite.height / 2 - 3;
+			_overlap.y = 	_core.y + _sprite.height / 2 - 18;
 			x =  			_core.x; 
 			y = 			_core.y;
 		}
@@ -295,19 +309,9 @@ package entity
 		private function fire():void {
 			if(Registry.PAUSE_STATE == PauseButton.PAUSE){
 				_doFire = false;
-				switch(_lastPressed) {
-					case FlxObject.UP:
-						trace('only fire one up!');						
-					break;
-					case FlxObject.DOWN:
-						trace('only fire one down!');
-					break;
-					case FlxObject.LEFT:
-						trace('only fire one left!');
-					break;
-					case FlxObject.RIGHT:
-						trace('only fire one right!');
-					break;
+				if (_counter > 1) {
+					FlxG.play(Embed.snd_sh, 1.0);
+					bullets.add(new Bullet(_sprite.getMidpoint().x, _sprite.getMidpoint().y, _lastPressed));
 				}
 			}
 		}
